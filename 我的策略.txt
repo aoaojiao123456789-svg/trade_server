@@ -1,0 +1,66 @@
+//@version=5
+strategy("10/50 EMA + MACD + Bollinger Bands Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === 参数设置 ===
+emaShortPeriod = input.int(5, title="Short EMA Period")
+emaLongPeriod = input.int(20, title="Long EMA Period")
+bbPeriod = input.int(20, title="Bollinger Bands Period")
+bbMultiplier = input.float(2.0, title="Bollinger Bands Multiplier")
+macdFast = input.int(12*4, title="MACD Fast Period")
+macdSlow = input.int(26*4, title="MACD Slow Period")
+macdSignal = input.int(9*4, title="MACD Signal Period")
+
+// === 技术指标计算 ===
+emaShort = ta.ema(close, emaShortPeriod)
+emaLong = ta.ema(close, emaLongPeriod)
+[basis, upper, lower] = ta.bb(close, bbPeriod, bbMultiplier)
+[macdLine, signalLine, _] = ta.macd(close, macdFast, macdSlow, macdSignal)
+
+MACD = ta.ema(close, macdFast) - ta.ema(close, macdSlow)
+aMACD = ta.ema(MACD, macdSignal)
+delta = MACD - aMACD
+source = close
+
+// === 策略条件 ===
+is_ma_up = ta.crossover(macdFast, macdSlow)
+is_ma_down = ta.crossunder(macdFast, macdSlow)
+is_macd_up = ta.crossover(delta, 0)
+is_macd_down = ta.crossunder(delta, 0)
+is_boll_low_price = ta.crossunder(source, lower) 
+is_boll_high_price = ta.crossover(source, upper)
+
+is_buy_boll = is_boll_low_price and delta > 0 
+is_sell_bull = is_boll_high_price and delta < 0
+
+is_buy_macd = is_macd_up and MACD < 0 and source < upper
+is_sell_macd = is_macd_down and MACD > 0 and source > lower
+
+is_buy_ma = ((is_macd_up and macdFast > macdSlow) or (is_ma_up and delta > 0)) 
+is_sell_ma = ((ta.crossunder(MACD, aMACD) and macdFast<macdSlow) or (is_ma_down and delta<0)) 
+
+// === 绘制指标 ===
+plot(emaShort, color=color.blue, title="Short EMA (10)")
+plot(emaLong, color=color.red, title="Long EMA (50)")
+plot(basis, title="BB Basis", color=color.blue)
+plot(upper, title="BB Upper", color=color.red)
+plot(lower, title="BB Lower", color=color.green)
+plot(macdLine, title="MACD Line", color=color.blue)
+plot(signalLine, title="MACD Signal Line", color=color.orange)
+
+// === 综合交易信号 ===
+buyEntry =  is_buy_ma
+sellEntry =  is_sell_ma
+
+// === 策略下单 ===
+if (buyEntry)
+    strategy.entry("Buy", strategy.long)  // 开多仓
+
+if (sellEntry)
+    strategy.entry("Sell", strategy.short)  // 开空仓
+
+// === 在均线附近动态标注买卖信号 ===
+if (buyEntry)
+    label.new(x=bar_index, y=emaShort, text="Buy", color=color.green, style=label.style_label_up, textcolor=color.white)
+
+if (sellEntry)
+    label.new(x=bar_index, y=emaShort, text="Sell", color=color.red, style=label.style_label_down, textcolor=color.white)

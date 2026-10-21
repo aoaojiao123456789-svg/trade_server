@@ -1,0 +1,63 @@
+//@version=5
+strategy('24X基因·日线全天候精控版', overlay = true, initial_capital = 1000, pyramiding = 1, default_qty_type = strategy.percent_of_equity, default_qty_value = 100)
+
+// --- 1. 指标校准 ---
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60) // 牛熊分界线
+atr = ta.atr(14)
+[macd, signal, delta] = ta.macd(close, 12, 26, 9)
+rsi = ta.rsi(close, 14)
+
+// 动态布林：牛市加宽，熊市收紧
+mult = close > ma60 ? 2.2 : 1.8
+dev = mult * ta.stdev(close, 20)
+upper = ma20 + dev
+lower = ma20 - dev
+
+// --- 2. 核心改进：引入“成交量+空头屏蔽”逻辑 ---
+vol_ma = ta.sma(volume, 20)
+// 增加成交量确认：入场必须放量
+is_vol_confirmed = volume > vol_ma * 1.1
+
+// 屏蔽逻辑：在 60 日线下方（空头市场），严禁任何追涨信号，只允许超跌抄底
+is_bull = close > ma60
+is_bear = close < ma60
+
+// 形态识别
+body_size = math.abs(close - open)
+lower_wick = math.min(open, close) - low
+is_pinbar = lower_wick > body_size * 2 and low < lower * 1.01
+
+// 【优化入场】
+// 1. 牛市逻辑：均线多头 + 动能翻正
+buy_bull = is_bull and ta.crossover(delta, 0) and close > ma20
+// 2. 熊市逻辑：严禁追高，只做超跌后的“放量反弹”
+buy_bear = is_bear and is_pinbar and is_vol_confirmed and rsi < 35
+
+if buy_bull or buy_bear
+    strategy.entry('Long', strategy.long, comment = is_bull ? '顺势追涨' : '超跌抄底')
+
+// --- 3. 策略优化：利润阶梯保护 (解决亏损关键) ---
+var float entry_p = na
+if strategy.position_size > 0 and strategy.position_size == 0
+    entry_p := strategy.position_avg_price
+
+if strategy.position_size > 0
+    // A. 熊市止盈：在 60 日线下，只要触碰中轨 (MA20) 必须全平，不贪！
+    if is_bear and ta.crossover(high, ma20)
+        strategy.close_all(comment = '空头反弹止盈')
+    
+    // B. 牛市止盈：阶梯平仓 (原逻辑)
+    if is_bull and ta.crossover(high, upper)
+        strategy.close_all(comment = '牛市上轨止盈')
+
+    // C. 强力风控：一旦盈利超过 3% 且出现阴线，立刻移动止损到成本
+    if close > entry_p * 1.03 and close < open
+        strategy.exit('Stop', 'Long', stop = entry_p * 1.005, comment = '保本离场')
+    else
+        // 初始止损：设在近 2 日最低点（减少回撤幅度）
+        strategy.exit('HardSL', 'Long', stop = math.min(ta.lowest(low, 2), entry_p - 1.2 * atr), comment = '止损离场')
+
+// 绘图
+plot(ma60, color=color.blue, linewidth=2, title="牛熊线")
+plot(ma20, color=color.orange, title="多空线")
