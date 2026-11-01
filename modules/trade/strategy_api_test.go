@@ -8,11 +8,11 @@ import (
 	"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/trade/strategy"
 )
 
-// sineKlines 正弦走势的日线，便于产生买卖信号
+// sineKlines 长短周期正弦叠加的日线，便于产生买卖信号（震荡市策略在长波上涨途中靠短波触发 EMA 金叉）
 func sineKlines(n int) []*Kline {
 	klines := make([]*Kline, n)
 	for i := range klines {
-		p := 100 + 15*math.Sin(float64(i)/15) + float64(i)*0.05
+		p := 100 + 15*math.Sin(float64(i)/20) + 5*math.Sin(float64(i)/3) + float64(i)*0.05
 		klines[i] = &Kline{StartTime: int64(i) * dayMillis, Symbol: "BTCUSDT", OpenPrice: p - 0.5,
 			HighPrice: p + 2, LowPrice: p - 2, ClosePrice: p, BaseVolume: 10 + float64(i%7)}
 	}
@@ -36,7 +36,7 @@ func TestRunBacktestAllStrategies(t *testing.T) {
 			t.Errorf("%s: 不应接受策略未定义的开关", info.ID)
 		}
 		if len(resp.Trades) == 0 {
-			t.Errorf("%s: 正弦行情应产生交易", info.ID)
+			t.Errorf("%s: 长短周期叠加的行情应产生交易", info.ID)
 		}
 		for _, tr := range resp.Trades {
 			if _, ok := resp.ReasonLabels[tr.ReasonCode]; !ok {
