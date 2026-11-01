@@ -79,6 +79,45 @@ func ATR(bars []OHLCV, period int) []float64 {
 	return RMA(tr, period)
 }
 
+// DMIResult ta.dmi 的三个返回值
+type DMIResult struct {
+	PlusDI  []float64
+	MinusDI []float64
+	ADX     []float64
+}
+
+// DMI ta.dmi(diLen, adxLen)：ADX 衡量趋势强度，不区分方向
+func DMI(bars []OHLCV, diLen, adxLen int) DMIResult {
+	n := len(bars)
+	plusDM, minusDM := nanSlice(n), nanSlice(n)
+	for i := 1; i < n; i++ {
+		up, down := bars[i].High-bars[i-1].High, bars[i-1].Low-bars[i].Low
+		plusDM[i], minusDM[i] = 0, 0
+		if up > down && up > 0 {
+			plusDM[i] = up
+		}
+		if down > up && down > 0 {
+			minusDM[i] = down
+		}
+	}
+	atr, plusRMA, minusRMA := ATR(bars, diLen), RMA(plusDM, diLen), RMA(minusDM, diLen)
+	plusDI, minusDI, dx := nanSlice(n), nanSlice(n), nanSlice(n)
+	for i := 0; i < n; i++ {
+		if math.IsNaN(plusRMA[i]) || math.IsNaN(atr[i]) {
+			continue
+		}
+		plusDI[i], minusDI[i] = 0, 0
+		if atr[i] > 0 {
+			plusDI[i], minusDI[i] = 100*plusRMA[i]/atr[i], 100*minusRMA[i]/atr[i]
+		}
+		dx[i] = 0
+		if sum := plusDI[i] + minusDI[i]; sum > 0 {
+			dx[i] = 100 * math.Abs(plusDI[i]-minusDI[i]) / sum
+		}
+	}
+	return DMIResult{PlusDI: plusDI, MinusDI: minusDI, ADX: RMA(dx, adxLen)}
+}
+
 // RSI ta.rsi(src, N)：涨跌幅分别做 RMA，RSI = 100 - 100/(1+涨/跌)
 func RSI(values []float64, period int) []float64 {
 	n := len(values)

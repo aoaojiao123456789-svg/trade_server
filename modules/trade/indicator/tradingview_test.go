@@ -35,6 +35,35 @@ func TestATR(t *testing.T) {
 	assertSeries(t, "ATR2", ATR(bars, 2), []float64{nan, 2.5, 3.25})
 }
 
+func TestDMI(t *testing.T) {
+	// 单边上涨：-DI 为 0，+DI > 0，ADX 趋近 100
+	up := make([]OHLCV, 80)
+	for i := range up {
+		p := 100 + float64(i)
+		up[i] = OHLCV{Open: p, High: p + 1, Low: p - 1, Close: p}
+	}
+	r := DMI(up, 14, 14)
+	if !math.IsNaN(r.PlusDI[13]) || math.IsNaN(r.PlusDI[14]) {
+		t.Errorf("DI 应从下标 14 起有效: %v %v", r.PlusDI[13], r.PlusDI[14])
+	}
+	// 第一个 DX 在下标 14，RMA(14) 需 14 个值 → 下标 27 起有效
+	if !math.IsNaN(r.ADX[26]) || math.IsNaN(r.ADX[27]) {
+		t.Errorf("ADX 应从下标 27 起有效: %v %v", r.ADX[26], r.ADX[27])
+	}
+	if r.MinusDI[79] != 0 || r.PlusDI[79] <= 0 || math.Abs(r.ADX[79]-100) > 1e-9 {
+		t.Errorf("单边上涨: +DI=%v -DI=%v ADX=%v", r.PlusDI[79], r.MinusDI[79], r.ADX[79])
+	}
+
+	// 价格完全不动：不应除零
+	flat := make([]OHLCV, 40)
+	for i := range flat {
+		flat[i] = OHLCV{Open: 100, High: 100, Low: 100, Close: 100}
+	}
+	if r := DMI(flat, 14, 14); r.ADX[39] != 0 || r.PlusDI[39] != 0 {
+		t.Errorf("横盘: ADX=%v +DI=%v", r.ADX[39], r.PlusDI[39])
+	}
+}
+
 func TestRSI(t *testing.T) {
 	// 涨跌：+1 +1 -1 +2；N=2：up SMA(1,1)=1，down SMA(0,0)=0 → 100
 	// 第3个变化：up=0.5*0+0.5*1=0.5，down=0.5*1+0=0.5 → 50

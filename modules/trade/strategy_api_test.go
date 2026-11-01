@@ -50,7 +50,17 @@ func TestRunBacktestAllStrategies(t *testing.T) {
 		}
 		var m map[string]any
 		_ = json.Unmarshal(b, &m)
-		for _, key := range []string{"strategy_id", "market", "rules", "options", "reason_labels", "indicator_labels", "trades", "summary", "pending_signal", "notes"} {
+		days := 0
+		for _, seg := range resp.Regimes {
+			days += seg.Days
+			if seg.Label == "" {
+				t.Errorf("%s: 市场阶段缺少中文标签 %+v", info.ID, seg)
+			}
+		}
+		if days != len(klines)-320 {
+			t.Errorf("%s: 市场阶段应覆盖整个区间，实际 %d 天", info.ID, days)
+		}
+		for _, key := range []string{"strategy_id", "market", "rules", "options", "reason_labels", "indicator_labels", "trades", "summary", "pending_signal", "notes", "regimes"} {
 			if _, ok := m[key]; !ok {
 				t.Errorf("%s: JSON 缺少字段 %s", info.ID, key)
 			}

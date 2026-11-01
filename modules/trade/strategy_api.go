@@ -57,6 +57,16 @@ type pendingSignalResp struct {
 	Indicators map[string]float64  `json:"indicators"`
 }
 
+// 区间内一段连续处于同一市场阶段的K线
+type regimeSegmentResp struct {
+	Regime     strategy.Market `json:"regime"` // bull / bear / range / unknown
+	Label      string          `json:"label"`
+	StartTime  int64           `json:"start_time"` // 首根K线开盘时间（毫秒）
+	EndTime    int64           `json:"end_time"`   // 末根K线开盘时间（毫秒）
+	Days       int             `json:"days"`
+	ChangeRate float64         `json:"change_rate"` // 首根开盘到末根收盘的涨跌幅
+}
+
 // BacktestResponse 回测接口返回
 type BacktestResponse struct {
 	StrategyID      string                         `json:"strategy_id"`
@@ -74,6 +84,7 @@ type BacktestResponse struct {
 	Trades          []*backtestTradeResp           `json:"trades"`
 	Summary         backtestSummaryResp            `json:"summary"`
 	PendingSignal   *pendingSignalResp             `json:"pending_signal"`
+	Regimes         []regimeSegmentResp            `json:"regimes"` // 区间内的市场阶段，按时间升序
 }
 
 // BacktestRequest 回测参数
@@ -93,7 +104,7 @@ func (o *OpenAPI) getStrategies(c *wkhttp.Context) {
 }
 
 // getStrategyBacktest 用策略回测时间段内的日线，返回每笔买卖记录与汇总
-// 参数: strategy 策略ID(默认 bull_24x)，symbol/start_time/end_time 同K线接口，capital 初始资金(默认10000)，
+// 参数: strategy 策略ID(默认 auto_regime)，symbol/start_time/end_time 同K线接口，capital 初始资金(默认10000)，
 // fee_rate 单边手续费率(默认0.001)，options 开启的策略开关，逗号分隔（见 /v1/strategies 的 options）
 func (o *OpenAPI) getStrategyBacktest(c *wkhttp.Context) {
 	q, err := parseKlineQuery(c)
@@ -188,6 +199,18 @@ func RunBacktest(klines []*Kline, start int, req BacktestRequest) (*BacktestResp
 		EndTime:         req.EndTime,
 		Trades:          make([]*backtestTradeResp, len(result.Trades)),
 		Summary:         backtestSummaryResp(result.Summary),
+		Regimes:         []regimeSegmentResp{},
+	}
+	for _, seg := range strategy.RegimeSegments(candles, start) {
+		first, last := candles[seg.StartIndex], candles[seg.EndIndex]
+		resp.Regimes = append(resp.Regimes, regimeSegmentResp{
+			Regime:     seg.Market,
+			Label:      strategy.MarketLabels[seg.Market],
+			StartTime:  first.Time,
+			EndTime:    last.Time,
+			Days:       seg.EndIndex - seg.StartIndex + 1,
+			ChangeRate: last.Close/first.Open - 1,
+		})
 	}
 	for i, t := range result.Trades {
 		tr := &backtestTradeResp{

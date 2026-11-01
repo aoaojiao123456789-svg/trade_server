@@ -36,12 +36,19 @@ type Market string
 const (
 	MarketBull  Market = "bull"  // 牛市（趋势上涨）
 	MarketRange Market = "range" // 震荡市
+	MarketBear  Market = "bear"  // 熊市（趋势下跌）
+	MarketAuto  Market = "auto"  // 不限环境：先判断市场阶段，再分派给对应策略
+	// MarketUnknown 指标数据不足，无法判断市场阶段
+	MarketUnknown Market = "unknown"
 )
 
 // MarketLabels 市场环境中文名
 var MarketLabels = map[Market]string{
-	MarketBull:  "牛市",
-	MarketRange: "震荡市",
+	MarketBull:    "牛市",
+	MarketRange:   "震荡市",
+	MarketBear:    "熊市",
+	MarketAuto:    "自适应",
+	MarketUnknown: "数据不足",
 }
 
 // Candle 策略需要的K线字段
@@ -233,9 +240,10 @@ type Result struct {
 // ================= 注册表 =================
 
 // DefaultID 默认策略
-const DefaultID = "bull_24x"
+const DefaultID = "auto_regime"
 
 var registry = []Strategy{
+	AutoRegime{},
 	Bull24X{},
 	RangeEMAMACD{},
 }
