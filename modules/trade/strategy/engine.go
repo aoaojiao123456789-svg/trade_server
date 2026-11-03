@@ -244,6 +244,7 @@ const DefaultID = "auto_regime"
 
 var registry = []Strategy{
 	AutoRegime{},
+	BullTrend{},
 	Bull24X{},
 	RangeEMAMACD{},
 }

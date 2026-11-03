@@ -47,8 +47,8 @@ func (o *OpenAPI) Route(r *wkhttp.WKHttp) {
 	r.GET("/v1/strategy/backtest", o.getStrategyBacktest)
 }
 
-// 单次查询最多返回的日线数（约 8 年）
-const maxKlineQueryLimit = 3000
+// 单次查询最多返回的日线数（约 13 年），需大于全部历史数据，否则查询全部时最新的K线会被截断
+const maxKlineQueryLimit = 5000
 
 type klineQuery struct {
 	symbol    string

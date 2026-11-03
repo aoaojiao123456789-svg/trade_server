@@ -14,9 +14,10 @@ const (
 )
 
 // klineSyncStartTime 日线数据起始时间（币安日线按 UTC 0 点切分），也是查询接口的默认开始时间。
+// 取币安 BTCUSDT 最早的日线，不能更早：币安没有更早的数据，库中最早一根会一直晚于起始时间，每分钟都会白请求一次。
 // 调早后下次同步会自动向前补齐。注意各策略需要指标预热（最长为震荡市策略约 300 天），
 // 回测开始日期距离该时间太近时，开头一段会因指标未成形而没有信号
-var klineSyncStartTime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()
+var klineSyncStartTime = time.Date(2017, 8, 17, 0, 0, 0, 0, time.UTC).UnixMilli()
 
 // 需要同步日线的交易对
 var klineSymbols = []string{"BTCUSDT"}
