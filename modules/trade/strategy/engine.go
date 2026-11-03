@@ -135,6 +135,12 @@ type Evaluator interface {
 	Snapshot(i int) map[string]float64
 }
 
+// ReadyChecker 指标需要预热的策略实现此接口：第 i 根K线的指标都已有效时返回 true，之前不买入。
+// 回测区间从数据最早处开始时（没有更早的K线可预热），开头一段指标不完整，按残缺指标交易会产生失真的信号
+type ReadyChecker interface {
+	Ready(i int) bool
+}
+
 // StopUpdater 需要挂止损单的策略实现此接口：持仓且无卖出信号时，在收盘后更新 pos.Stops
 type StopUpdater interface {
 	UpdateStops(i int, pos *Position)
@@ -295,6 +301,7 @@ func Simulate(ev Evaluator, candles []Candle, startIndex int, initialCapital, fe
 	var pos *Position
 	var pending *order
 	stops, _ := ev.(StopUpdater)
+	ready, _ := ev.(ReadyChecker)
 
 	buy := func(i int, price float64, o *order) {
 		fee := cash * feeRate
@@ -352,7 +359,9 @@ func Simulate(ev Evaluator, candles []Candle, startIndex int, initialCapital, fe
 		// 3. 本根收盘计算信号
 		var sig Signal
 		if pos == nil {
-			sig = ev.Entry(i)
+			if ready == nil || ready.Ready(i) {
+				sig = ev.Entry(i)
+			}
 		} else {
 			sig = ev.Exit(i, pos)
 			if sig.Action == ActionNone && stops != nil {

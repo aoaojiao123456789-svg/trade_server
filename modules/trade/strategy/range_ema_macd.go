@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/trade/indicator"
 )
@@ -151,6 +152,11 @@ func (e *rangeEMAMACDEval) Snapshot(i int) map[string]float64 {
 		"macd": ind.MACD, "signal": ind.Signal, "delta": ind.Delta,
 		"bb_basis": ind.BBBasis, "bb_upper": ind.BBUpper, "bb_lower": ind.BBLower,
 	})
+}
+
+// Ready 慢速 MACD 成形最晚，它有效时其余指标也都有效
+func (e *rangeEMAMACDEval) Ready(i int) bool {
+	return !math.IsNaN(e.ind.Delta[i])
 }
 
 // trendEntry 第 i 根K线收盘时是否满足趋势单买入条件
